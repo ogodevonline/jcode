@@ -474,6 +474,36 @@ mod tests {
         assert!((cost.output_usd_per_mtok - 1.50).abs() < 1e-9);
         assert_eq!(cost.cache_read_usd_per_mtok, Some(0.02));
 
+        // Exact-id match beats bare-name match: when one provider lists the
+        // full `vendor/model` id and another lists only the bare name, the
+        // full-id listing is the authority even if its price differs.
+        save_test_cache(&[
+            (
+                "first-party-vendor",
+                "acme/tiny-model",
+                ModelCost {
+                    input_usd_per_mtok: 0.30,
+                    output_usd_per_mtok: 2.50,
+                    cache_read_usd_per_mtok: Some(0.05),
+                    cache_write_usd_per_mtok: None,
+                },
+            ),
+            (
+                "reseller-bare-listing",
+                "tiny-model",
+                ModelCost {
+                    input_usd_per_mtok: 0.99,
+                    output_usd_per_mtok: 9.99,
+                    cache_read_usd_per_mtok: None,
+                    cache_write_usd_per_mtok: None,
+                },
+            ),
+        ]);
+        let cost = lookup("openai-compatible:kilocode", "acme/tiny-model").expect("priced");
+        assert!((cost.input_usd_per_mtok - 0.30).abs() < 1e-9);
+        assert!((cost.output_usd_per_mtok - 2.50).abs() < 1e-9);
+        assert_eq!(cost.cache_read_usd_per_mtok, Some(0.05));
+
         clear_memory_cache_for_tests();
         if let Some(prev) = prev_home {
             crate::env::set_var("JCODE_HOME", prev);
